@@ -1,4 +1,12 @@
 {$HOSTNAME} {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
 	route /api* {
 		uri strip_prefix /api
 		reverse_proxy http://api:14702 {
@@ -33,6 +41,9 @@
 			header_down Location "^/" "/gifbox/"
 		}
 	}
+
+	# Health check endpoint for container monitoring
+	respond /health 200
 
 	reverse_proxy http://web:5000
 }

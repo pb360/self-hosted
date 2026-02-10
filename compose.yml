@@ -3,29 +3,39 @@ name: stoat
 services:
   # MongoDB: Database
   database:
-    image: docker.io/mongo
+    image: docker.io/mongo:7.0
     restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
     volumes:
       - ./data/db:/data/db
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh -u $${MONGO_INITDB_ROOT_USERNAME} -p $${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin localhost:27017/test --quiet
       interval: 10s
       timeout: 10s
       retries: 5
       start_period: 10s
+    mem_limit: 512m
 
   # Redis: Event message broker & KV store
   redis:
-    image: docker.io/eqalpha/keydb
+    image: docker.io/eqalpha/keydb:6.3.4
     restart: always
+    healthcheck:
+      test: keydb-cli ping
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    mem_limit: 128m
 
   # RabbitMQ: Internal message broker
   rabbit:
-    image: docker.io/rabbitmq:4
+    image: docker.io/rabbitmq:4.0
     restart: always
     environment:
-      RABBITMQ_DEFAULT_USER: rabbituser
-      RABBITMQ_DEFAULT_PASS: rabbitpass
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     volumes:
       - ./data/rabbit:/var/lib/rabbitmq
     healthcheck:
@@ -34,16 +44,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    mem_limit: 256m
 
   # MinIO: S3-compatible storage server
   minio:
-    image: docker.io/minio/minio
+    image: docker.io/minio/minio:RELEASE.2024-10-13T13-34-11Z
     command: server /data
     volumes:
       - ./data/minio:/data
     environment:
-      MINIO_ROOT_USER: minioautumn
-      MINIO_ROOT_PASSWORD: minioautumn
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASS}
       MINIO_DOMAIN: minio
     networks:
       default:
@@ -57,10 +68,17 @@ services:
           - banners.minio
           - emojis.minio
     restart: always
+    healthcheck:
+      test: mc ready local || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    mem_limit: 256m
 
   # Caddy: Web server
   caddy:
-    image: docker.io/caddy
+    image: docker.io/caddy:2.9
     restart: always
     env_file: .env.web
     ports:
@@ -70,6 +88,12 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - ./data/caddy-data:/data
       - ./data/caddy-config:/config
+    healthcheck:
+      test: wget -qO- http://localhost:80/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    mem_limit: 128m
 
   # API server
   api:
@@ -86,6 +110,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 256m
 
   # Events service
   events:
@@ -100,12 +125,14 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 256m
 
   # Web App
   web:
-    image: ghcr.io/revoltchat/client:master
+    image: ghcr.io/revoltchat/client:20250930-2
     restart: always
     env_file: .env.web
+    mem_limit: 128m
 
   # File server
   autumn:
@@ -120,6 +147,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 256m
 
   # Metadata and image proxy
   january:
@@ -129,6 +157,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 256m
 
   # Tenor proxy
   gifbox:
@@ -138,6 +167,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 128m
 
   # Regular task daemon
   crond:
@@ -152,6 +182,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 128m
 
   # Push notification daemon
   pushd:
@@ -168,16 +199,20 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
+    mem_limit: 128m
 
   # Create buckets for minio.
   createbuckets:
-    image: docker.io/minio/mc
+    image: docker.io/minio/mc:RELEASE.2024-10-08T09-37-26Z
     depends_on:
       - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASS: ${MINIO_ROOT_PASS}
     entrypoint: >
       /bin/sh -c "
       while ! /usr/bin/mc ready minio; do
-        /usr/bin/mc alias set minio http://minio:9000 minioautumn minioautumn;
+        /usr/bin/mc alias set minio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASS};
         echo 'Waiting minio...' && sleep 1;
       done;
       /usr/bin/mc mb minio/revolt-uploads;
