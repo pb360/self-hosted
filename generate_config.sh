@@ -62,6 +62,8 @@ echo "Created .env.web"
 
 # --- Write Revolt.toml ---
 cat > Revolt.toml <<EOF
+production = true
+
 [database]
 mongodb = "mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@database/?authSource=admin"
 redis = "redis://redis/"
@@ -72,6 +74,17 @@ api = "https://${HOSTNAME}/api"
 events = "wss://${HOSTNAME}/ws"
 autumn = "https://${HOSTNAME}/autumn"
 january = "https://${HOSTNAME}/january"
+
+[api]
+
+[api.registration]
+invite_only = false
+
+[api.smtp]
+host = ""
+username = ""
+password = ""
+from_address = "noreply@${HOSTNAME}"
 
 [rabbit]
 host = "rabbit"
