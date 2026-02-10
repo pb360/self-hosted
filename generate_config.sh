@@ -8,7 +8,13 @@ if [ $# -ne 1 ] || [ -z "$1" ]; then
     exit 1
 fi
 
-HOSTNAME="$1"
+HOSTNAME="${1#https://}"
+HOSTNAME="${HOSTNAME#http://}"
+
+if [[ "$HOSTNAME" == */* ]] || [[ "$HOSTNAME" == *" "* ]]; then
+    echo "ERROR: hostname must be a bare host (example: chat.safespace.place)"
+    exit 1
+fi
 
 # --- Idempotency guard ---
 if [ -f Revolt.toml ]; then
@@ -103,7 +109,8 @@ cat >> Revolt.toml <<EOF
 [files]
 encryption_key = "${ENCRYPTION_KEY}"
 EOF
-chmod 600 Revolt.toml .env.web
+chmod 644 Revolt.toml
+chmod 600 .env.web
 
 echo ""
 echo "=== Configuration generated successfully ==="

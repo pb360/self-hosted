@@ -1,10 +1,18 @@
 name: stoat
 
+x-logging: &default-logging
+  driver: "local"
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # MongoDB: Database
   database:
-    image: docker.io/mongo:7.0
+    image: docker.io/mongo:7.0@sha256:606f8e029603330411a7dd10b5ffd50eefc297fc80cee89f10a455e496a76ae7
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
     restart: always
+    logging: *default-logging
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?MONGO_ROOT_USER not set - run generate_config.sh first}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS:?MONGO_ROOT_PASS not set - run generate_config.sh first}
@@ -20,8 +28,9 @@ services:
 
   # Redis: Event message broker & KV store
   redis:
-    image: docker.io/eqalpha/keydb:6.3.4
+    image: docker.io/eqalpha/keydb:latest@sha256:6537505c42355ca1f571276bddf83f5b750f760f07b2a185a676481791e388ac
     restart: always
+    logging: *default-logging
     healthcheck:
       test: keydb-cli ping
       interval: 10s
@@ -31,8 +40,9 @@ services:
 
   # RabbitMQ: Internal message broker
   rabbit:
-    image: docker.io/rabbitmq:4.0
+    image: docker.io/rabbitmq:4.0@sha256:b691a86d3a9677b00f011dd7bb2c9825d32839730cf54c971aec8a71edc1b07d
     restart: always
+    logging: *default-logging
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER not set - run generate_config.sh first}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?RABBITMQ_PASS not set - run generate_config.sh first}
@@ -48,8 +58,9 @@ services:
 
   # MinIO: S3-compatible storage server
   minio:
-    image: docker.io/minio/minio:RELEASE.2024-10-13T13-34-11Z
+    image: docker.io/minio/minio:RELEASE.2024-10-13T13-34-11Z@sha256:9535594ad4122b7a78c6632788a989b96d9199b483d3bd71a5ceae73a922cdfa
     command: server /data
+    logging: *default-logging
     volumes:
       - ./data/minio:/data
     environment:
@@ -78,8 +89,9 @@ services:
 
   # Caddy: Web server
   caddy:
-    image: docker.io/caddy:2.9
+    image: docker.io/caddy:2.9@sha256:748016f285ed8c43a9ce6e3aed6d92d3009d90ca41157950880f40beaf3ff62b
     restart: always
+    logging: *default-logging
     env_file: .env.web
     ports:
       - "80:80"
@@ -97,7 +109,8 @@ services:
 
   # API server
   api:
-    image: ghcr.io/revoltchat/server:20250930-2
+    image: ghcr.io/revoltchat/server:20250930-2@sha256:3186190b0c131a39cb6fd251d13ab826651603073c2e5b34695806007ea4a463
+    logging: *default-logging
     depends_on:
       database:
         condition: service_healthy
@@ -114,7 +127,8 @@ services:
 
   # Events service
   events:
-    image: ghcr.io/revoltchat/bonfire:20250930-2
+    image: ghcr.io/revoltchat/bonfire:20250930-2@sha256:2d17f1b885c91a5c608bb2945403717612e96b44be0eaeb752f14fab3bd3886f
+    logging: *default-logging
     depends_on:
       database:
         condition: service_healthy
@@ -129,19 +143,21 @@ services:
 
   # Web App
   web:
-    image: ghcr.io/revoltchat/client:20250930-2
+    image: ghcr.io/revoltchat/client:master@sha256:5cc05853c215a02ee3d1f71390ad00af06c7ef53602b4b21f419f8702607d8c8
     restart: always
+    logging: *default-logging
     env_file: .env.web
     mem_limit: 64m
 
   # File server
   autumn:
-    image: ghcr.io/revoltchat/autumn:20250930-2
+    image: ghcr.io/revoltchat/autumn:20250930-2@sha256:d0ee55f41deabdc80e53aa057bde2724120355700c2a1976d7cac5873137a796
+    logging: *default-logging
     depends_on:
       database:
         condition: service_healthy
       createbuckets:
-        condition: service_started
+        condition: service_completed_successfully
     volumes:
       - type: bind
         source: ./Revolt.toml
@@ -151,7 +167,8 @@ services:
 
   # Metadata and image proxy
   january:
-    image: ghcr.io/revoltchat/january:20250930-2
+    image: ghcr.io/revoltchat/january:20250930-2@sha256:f4ade709bbf80e460a55a9240b5fc628b69d0e05d6fe48948616f1614bea6d85
+    logging: *default-logging
     volumes:
       - type: bind
         source: ./Revolt.toml
@@ -161,7 +178,8 @@ services:
 
   # Tenor proxy
   gifbox:
-    image: ghcr.io/revoltchat/gifbox:20250930-2
+    image: ghcr.io/revoltchat/gifbox:20250930-2@sha256:6681a316fc237978f2bf31004c068897c2d98cce3f290399bbdaab074caa7394
+    logging: *default-logging
     volumes:
       - type: bind
         source: ./Revolt.toml
@@ -171,7 +189,8 @@ services:
 
   # Regular task daemon
   crond:
-    image: ghcr.io/revoltchat/crond:20250930-2
+    image: ghcr.io/revoltchat/crond:20250930-2@sha256:f9f7f83a63beb389ea9d29ff580347c3e96a8d2ea62a4dfaa58ebada9979429e
+    logging: *default-logging
     depends_on:
       database:
         condition: service_healthy
@@ -186,7 +205,8 @@ services:
 
   # Push notification daemon
   pushd:
-    image: ghcr.io/revoltchat/pushd:20250930-2
+    image: ghcr.io/revoltchat/pushd:20250930-2@sha256:618e60ae64e7dfd9a7a44bcc9726a2fc09b52213dfe30f2fec47b873321f4de8
+    logging: *default-logging
     depends_on:
       database:
         condition: service_healthy
@@ -203,7 +223,9 @@ services:
 
   # Create buckets for minio.
   createbuckets:
-    image: docker.io/minio/mc:RELEASE.2024-10-08T09-37-26Z
+    image: docker.io/minio/mc:RELEASE.2024-10-08T09-37-26Z@sha256:c0d345a438dcac5677c1158e4ac46637069b67b3cc38e7b04c08cf93bdee4a62
+    logging: *default-logging
+    restart: "no"
     depends_on:
       - minio
     environment:
@@ -211,10 +233,12 @@ services:
       MINIO_ROOT_PASS: ${MINIO_ROOT_PASS:?missing}
     entrypoint: >
       /bin/sh -c "
-      while ! /usr/bin/mc ready minio; do
-        /usr/bin/mc alias set minio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASS};
+      until /usr/bin/mc alias set minio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASS} >/dev/null 2>&1; do
+        echo 'Waiting minio alias...' && sleep 1;
+      done;
+      until /usr/bin/mc ready minio >/dev/null 2>&1; do
         echo 'Waiting minio...' && sleep 1;
       done;
-      /usr/bin/mc mb minio/revolt-uploads;
+      /usr/bin/mc mb --ignore-existing minio/revolt-uploads;
       exit 0;
       "
