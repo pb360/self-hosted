@@ -42,8 +42,5 @@
 		}
 	}
 
-	# Health check endpoint for container monitoring
-	respond /health 200
-
 	reverse_proxy http://web:5000
 }

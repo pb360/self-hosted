@@ -6,8 +6,8 @@ services:
     image: docker.io/mongo:7.0
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?MONGO_ROOT_USER not set - run generate_config.sh first}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS:?MONGO_ROOT_PASS not set - run generate_config.sh first}
     volumes:
       - ./data/db:/data/db
     healthcheck:
@@ -16,7 +16,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
-    mem_limit: 512m
+    mem_limit: 384m
 
   # Redis: Event message broker & KV store
   redis:
@@ -27,15 +27,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    mem_limit: 128m
+    mem_limit: 64m
 
   # RabbitMQ: Internal message broker
   rabbit:
     image: docker.io/rabbitmq:4.0
     restart: always
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER not set - run generate_config.sh first}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?RABBITMQ_PASS not set - run generate_config.sh first}
     volumes:
       - ./data/rabbit:/var/lib/rabbitmq
     healthcheck:
@@ -44,7 +44,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-    mem_limit: 256m
+    mem_limit: 128m
 
   # MinIO: S3-compatible storage server
   minio:
@@ -53,8 +53,8 @@ services:
     volumes:
       - ./data/minio:/data
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASS}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER not set - run generate_config.sh first}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASS:?MINIO_ROOT_PASS not set - run generate_config.sh first}
       MINIO_DOMAIN: minio
     networks:
       default:
@@ -69,12 +69,12 @@ services:
           - emojis.minio
     restart: always
     healthcheck:
-      test: mc ready local || exit 1
+      test: curl -sf http://localhost:9000/minio/health/live || exit 1
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
-    mem_limit: 256m
+    mem_limit: 128m
 
   # Caddy: Web server
   caddy:
@@ -89,11 +89,11 @@ services:
       - ./data/caddy-data:/data
       - ./data/caddy-config:/config
     healthcheck:
-      test: wget -qO- http://localhost:80/health || exit 1
+      test: wget -qO- http://localhost:2019/config/ >/dev/null 2>&1 || exit 1
       interval: 15s
       timeout: 5s
       retries: 3
-    mem_limit: 128m
+    mem_limit: 64m
 
   # API server
   api:
@@ -110,7 +110,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 256m
+    mem_limit: 192m
 
   # Events service
   events:
@@ -125,14 +125,14 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 256m
+    mem_limit: 128m
 
   # Web App
   web:
     image: ghcr.io/revoltchat/client:20250930-2
     restart: always
     env_file: .env.web
-    mem_limit: 128m
+    mem_limit: 64m
 
   # File server
   autumn:
@@ -147,7 +147,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 256m
+    mem_limit: 128m
 
   # Metadata and image proxy
   january:
@@ -157,7 +157,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 256m
+    mem_limit: 128m
 
   # Tenor proxy
   gifbox:
@@ -167,7 +167,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 128m
+    mem_limit: 64m
 
   # Regular task daemon
   crond:
@@ -182,7 +182,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 128m
+    mem_limit: 64m
 
   # Push notification daemon
   pushd:
@@ -199,7 +199,7 @@ services:
         source: ./Revolt.toml
         target: /Revolt.toml
     restart: always
-    mem_limit: 128m
+    mem_limit: 64m
 
   # Create buckets for minio.
   createbuckets:
@@ -207,8 +207,8 @@ services:
     depends_on:
       - minio
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASS: ${MINIO_ROOT_PASS}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?missing}
+      MINIO_ROOT_PASS: ${MINIO_ROOT_PASS:?missing}
     entrypoint: >
       /bin/sh -c "
       while ! /usr/bin/mc ready minio; do

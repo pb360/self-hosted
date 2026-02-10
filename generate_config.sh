@@ -103,6 +103,7 @@ cat >> Revolt.toml <<EOF
 [files]
 encryption_key = "${ENCRYPTION_KEY}"
 EOF
+chmod 600 Revolt.toml .env.web
 
 echo ""
 echo "=== Configuration generated successfully ==="
